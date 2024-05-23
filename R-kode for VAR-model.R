@@ -8,6 +8,7 @@ library(forecast)
 library(vars)
 library(strucchange)
 library(dLagM)
+
 ##################### IMPORTERE ELPRISER SAMT SÆSONKORRIGERE DET
 
 # Fetch data (KUN FOR ELPRISER, HUSK AT LAVE FOR ELFORBRUGET OGSÅ)
@@ -190,7 +191,7 @@ chow_test <- chow.test(Første_var, SB = 297.5)
 summary(chow_test)
 
 
-################### HJJJDJDJDJ
+################### VAR før structucal break konstrueres
 var_data_2 <- data.frame(
   Electricity_price = dl_weekly_mean_ts[1:297],
   Electricity_consumption = Stokastisk_forbrug_trimmed[1:297])
@@ -247,13 +248,6 @@ plot(feir)
 ####PREDICTION ###
 
 
-
-
-
-
-
-
-
 Første_var_predict <- predict(VAR_2_restrict, n.ahead = 2)
 
 
@@ -296,7 +290,6 @@ inv_diff_PI_lower <- cumsum(c(lweekly_mean_ts[1],new_ts_pi_lower))
 inv_diff_PI_lower_exp <- exp(inv_diff_PI_lower)
 inv_diff_PI_upper <- cumsum(c(lweekly_mean_ts[1],new_ts_pi_upper))
 inv_diff_PI_upper_exp <- exp(inv_diff_PI_upper)
-print(exp(inv_diff_PI_upper))
 
 
 elprice_with_prediction <- c(weekly_mean_ts[1:298], inv_diff_exp[299:300])
@@ -336,15 +329,11 @@ combined_ts <- cbind(ts_elprice_segment, full_length_inv_diff_ts_lower_segment, 
 ts.plot(combined_ts, col = c("blue", "red", "red"), ylab = "Weekly Mean Spot price")
 
 
-
-print(ts_elprice_with_prediction)
-print(weekly_mean_ts)
 # Rigtige værdier
 full_length_reel = rep(NA, length(ts_elprice_with_prediction))
 full_length_reel[299:300] = weekly_mean_ts[299:300]
 full_length_reel_ts = ts(full_length_reel, start=start(ts_elprice_with_prediction), frequency=frequency(ts_elprice_with_prediction))
 
-print(weekly_mean_ts)
 
 
 # Plot the combined time series
@@ -354,41 +343,14 @@ ts.plot(combined_ts,full_length_reel_ts[200:300], col = c("blue", "red", "red","
 ##################### Elforbrug predict
 
 
-
-
-
-
-# Specify the last existing value of t and the number of future points needed
-last_t <- 393
-future_t <- c(last_t + 1, last_t + 2)  # This produces t = 394 and 395
-
-# Create a new data frame for these future time points
-future_data <- data.frame(
-  t = future_t,
-  sin_t_week = sin(future_t * 2 * pi / 52),
-  cos_t_week = cos(future_t * 2 * pi / 52),
-  sin_t_biweek = sin(future_t * 4 * pi / 52),
-  cos_t_biweek = cos(future_t * 4 * pi / 52),
-  sin_t_month = sin(future_t * 2 * pi / (52 / 12)),
-  cos_t_month = cos(future_t * 2 * pi / (52 / 12))
-)
-
-
-# Assuming Deterministisk is your linear model
-Deterministisk_predict <- predict(Deterministisk, newdata = future_data)
-
-print(Deterministisk_predict)
-###########################
-
 Deterministisk_values <- Deterministisk$fitted.values[299:300]
-print(Deterministisk_values)
+
 
 
 print(Første_var_predict$fcst$Electricity_consumption)
 Prediction_tal <- exp(Første_var_predict$fcst$Electricity_consumption[1,] + Deterministisk_values[1])
 Prediction_tal2 <- exp(Første_var_predict$fcst$Electricity_consumption[2,] + Deterministisk_values[2])
-print(Prediction_tal)
-print(Prediction_tal2)
+
 
 elconsum_with_prediction <- c(weekly_mean_forbrugts[1:298], Prediction_tal[1],Prediction_tal2[1])
 ts_elconsum_with_prediction <- ts(elconsum_with_prediction, start = start(weekly_mean_forbrugts), frequency = frequency(weekly_mean_forbrugts))
@@ -448,15 +410,6 @@ ts.plot(combined_ts_consump,full_length_forbrug__reel_ts[200:300], col = c("blue
 
 
 
-
-
-
-
-
-
-
-
-
 #### ANDEN VAR MODEL
 
 
@@ -473,22 +426,11 @@ Var_chow <- VAR(var_data_chow, p = 3)
 summary(Var_chow)
 ########## ADL MODEL
 
-
-###############################PRediction af ADL model
-
-
-# Load necessary library
-library(dLagM)
-
-
-
 # Define your data
 y <- var_data_chow$Electricity_consumption
 x <- var_data_chow$Electricity_price
 
 
-# Load necessary package
-library(forecast)
 
 
 # Parameters to remove
@@ -528,16 +470,9 @@ Acf(standardized_residuals, lag.max = 52)
 
 
 
-library(ggplot2)
-install.packages("qqplotr")
-library(qqplotr)
 
 # Convert residuals to a numeric vector
 numeric_residuals <- as.numeric(standardized_residuals)
-
-
-
-
 
 
 
@@ -547,9 +482,10 @@ forecast_test <- forecast(model = model.ardl , x = c(var_data_chow$Electricity_p
 print(forecast_test)
 forecast_value <- forecast_test$forecasts$Forecast
 
+last_t <- 393
+future_t <- c(last_t + 1, last_t + 2)  # This produces t = 394 and 395
 
-
-
+# Create a new data frame for these future time points
 future_data <- data.frame(
   t = future_t,
   sin_t_week = sin(future_t * 2 * pi / 52),
@@ -560,8 +496,10 @@ future_data <- data.frame(
   cos_t_month = cos(future_t * 2 * pi / (52 / 12))
 )
 
+
 # Assuming Deterministisk is your linear model
 Deterministisk_predict <- predict(Deterministisk, newdata = future_data)
+
 
 
 
@@ -581,11 +519,6 @@ elconsum_with_prediction_adl <- c(weekly_mean_forbrugts[298:393], Forecast_value
 ts_elconsum_with_prediction_adl <- ts(elconsum_with_prediction_adl, start = c(start_year, start_week), frequency = 52)
 
 
-
-
-ts.plot(ts_elconsum_with_prediction_adl)
-
-print(elconsum_with_prediction_adl)
 
 
 full_length_con_lower_adl = rep(NA, length(ts_elconsum_with_prediction_adl))  # Fill with NAs
@@ -612,7 +545,6 @@ combined_ts_consump <- cbind(ts_elconsump_segment_adl, full_length_inv_diff_ts_l
 
 
 
-
 # Plot the combined time series
 ts.plot(ts_elconsum_with_prediction_adl, col = c("blue"), ylab = "Weekly Mean Consumption")
 
@@ -623,43 +555,8 @@ points(time(ts_elconsum_with_prediction_adl)[97], full_length_ts_upper_adl[97], 
 # Add the point for full_length_ts_lower_adl at observation 97
 points(time(ts_elconsum_with_prediction_adl)[97], full_length_ts_lower_adl[97], col = "red", pch = 19)
 
-
-
+#### R-koden for det andet dokument skal køres for at hente denne værdi.
 points(time(ts_elconsum_with_prediction_adl)[97], weekly_mean_forbrug_rigtig_ts[1], col = "black", pch = 19)
-
-print(Forecast_value)
-
-
-print(ts_elconsum_with_prediction_adl)
-ts.plot(full_length_con_lower_adl)
-
-print(weekly_mean_forbrugts)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
